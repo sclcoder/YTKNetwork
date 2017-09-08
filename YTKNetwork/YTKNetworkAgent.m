@@ -241,6 +241,14 @@
 - (void)cancelRequest:(YTKBaseRequest *)request {
     NSParameterAssert(request != nil);
 
+    Lock();
+    YTKBaseRequest *tempRequest = _requestsRecord[@(request.requestTask.taskIdentifier)];
+    Unlock();
+    
+    if (!tempRequest) {
+        return;
+    }
+    
     if (request.resumableDownloadPath) {
         NSURLSessionDownloadTask *requestTask = (NSURLSessionDownloadTask *)request.requestTask;
         [requestTask cancelByProducingResumeData:^(NSData *resumeData) {
