@@ -63,7 +63,10 @@
     if (self) {
         _config = [YTKNetworkConfig sharedConfig];
         _manager = [[AFHTTPSessionManager alloc] initWithSessionConfiguration:_config.sessionConfiguration];
+        
+        // 记录所有的YTKBaseRequest
         _requestsRecord = [NSMutableDictionary dictionary];
+        
         _processingQueue = dispatch_queue_create("com.yuantiku.networkagent.processing", DISPATCH_QUEUE_CONCURRENT);
         _allStatusCodes = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(100, 500)];
         pthread_mutex_init(&_lock, NULL);
@@ -164,6 +167,16 @@
     return requestSerializer;
 }
 
+
+
+
+/**
+ Description 发起网络请求的入口方法
+
+ @param request request
+ @param error error
+ @return Task
+ */
 - (NSURLSessionTask *)sessionTaskForRequest:(YTKBaseRequest *)request error:(NSError * _Nullable __autoreleasing *)error {
     YTKRequestMethod method = [request requestMethod];
     NSString *url = [self buildRequestUrl:request];
@@ -191,6 +204,12 @@
     }
 }
 
+
+/**
+ 将创建的YTKBaseRequest加入容器并开启task
+
+ @param request 请求信息
+ */
 - (void)addRequest:(YTKBaseRequest *)request {
     NSParameterAssert(request != nil);
 
@@ -204,6 +223,7 @@
         }];
         request.requestTask = dataTask;
     } else {
+        // 创建sessionTask
         request.requestTask = [self sessionTaskForRequest:request error:&requestSerializationError];
     }
 
@@ -235,6 +255,8 @@
     // Retain request
     YTKLog(@"Add request: %@", NSStringFromClass([request class]));
     [self addRequestToRecord:request];
+    
+    // 开启sessionTask
     [request.requestTask resume];
 }
 
@@ -290,6 +312,7 @@
     }
     id json = [request responseJSONObject];
     id validator = [request jsonValidator];
+    // 是jsonObject
     if (json && validator) {
         result = [YTKNetworkUtils validateJSON:json withValidator:validator];
         if (!result) {
@@ -302,6 +325,15 @@
     return YES;
 }
 
+
+
+/**
+ 处理AFN的回调信息
+
+ @param task task
+ @param responseObject 响应
+ @param error error
+ */
 - (void)handleRequestResult:(NSURLSessionTask *)task responseObject:(id)responseObject error:(NSError *)error {
     Lock();
     YTKBaseRequest *request = _requestsRecord[@(task.taskIdentifier)];
@@ -312,7 +344,7 @@
     //
     // Here we choose to completely ignore cancelled tasks. Neither success or failure
     // callback will be called.
-    if (!request) {
+    if (!request) { // 请求已经取消时
         return;
     }
 
@@ -366,7 +398,11 @@
 }
 
 - (void)requestDidSucceedWithRequest:(YTKBaseRequest *)request {
+    /**
+      数据回调前后的各种其他事件的处理
+     */
     @autoreleasepool {
+        // 数据回调前的预处理: 如YTKRequest自实现的缓存处理
         [request requestCompletePreprocessor];
     }
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -463,6 +499,7 @@
     __block NSURLSessionDataTask *dataTask = nil;
     dataTask = [_manager dataTaskWithRequest:request
                            completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *_error) {
+                               /// AFN的回调内容
                                [self handleRequestResult:dataTask responseObject:responseObject error:_error];
                            }];
 

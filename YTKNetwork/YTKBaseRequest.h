@@ -318,6 +318,7 @@ typedef void(^YTKRequestCompletionBlock)(__kindof YTKBaseRequest *request);
 
 ///  Use this to build custom request. If this method return non-nil value, `requestUrl`, `requestTimeoutInterval`,
 ///  `requestArgument`, `allowsCellularAccess`, `requestMethod` and `requestSerializerType` will all be ignored.
+//  如果构建自定义的 request，会忽略其他的一切自定义 request 的方法，例如 requestUrl, requestArgument, requestMethod, requestSerializerType,requestHeaderFieldValueDictionary 等等
 - (nullable NSURLRequest *)buildCustomUrlRequest;
 
 ///  Should use CDN when sending request.

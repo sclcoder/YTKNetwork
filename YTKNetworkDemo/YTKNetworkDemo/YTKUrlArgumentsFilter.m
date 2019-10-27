@@ -18,6 +18,7 @@
     self = [super init];
     if (self) {
         _arguments = arguments;
+        [self urlStringWithOriginUrlString:@"http://www.baidu.com?name=123&pwd=456" appendParameters:arguments];
     }
     return self;
 }
@@ -50,7 +51,8 @@
     components.query = newQueryString;
 
     if (useDummyUrl) {
-        return [components.URL.absoluteString substringFromIndex:dummyUrl.length - 1];
+        NSString *str = [components.URL.absoluteString substringFromIndex:dummyUrl.length - 1];
+        return str;
     } else {
         return components.URL.absoluteString;
     }

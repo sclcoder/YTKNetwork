@@ -48,11 +48,15 @@ static dispatch_queue_t ytkrequest_cache_writing_queue() {
 }
 
 @interface YTKCacheMetadata : NSObject<NSSecureCoding>
-
+// 版本
 @property (nonatomic, assign) long long version;
+// 敏感数据
 @property (nonatomic, strong) NSString *sensitiveDataString;
+// 编码方式
 @property (nonatomic, assign) NSStringEncoding stringEncoding;
+// 缓存数据的时间
 @property (nonatomic, strong) NSDate *creationDate;
+// app版本
 @property (nonatomic, strong) NSString *appVersionString;
 
 @end
@@ -76,7 +80,7 @@ static dispatch_queue_t ytkrequest_cache_writing_queue() {
     if (!self) {
         return nil;
     }
-
+    // NSSecureCoding协议
     self.version = [[aDecoder decodeObjectOfClass:[NSNumber class] forKey:NSStringFromSelector(@selector(version))] integerValue];
     self.sensitiveDataString = [aDecoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(sensitiveDataString))];
     self.stringEncoding = [[aDecoder decodeObjectOfClass:[NSNumber class] forKey:NSStringFromSelector(@selector(stringEncoding))] integerValue];
@@ -103,22 +107,22 @@ static dispatch_queue_t ytkrequest_cache_writing_queue() {
 @implementation YTKRequest
 
 - (void)start {
-    if (self.ignoreCache) {
+    if (self.ignoreCache) { // 忽略缓存
         [self startWithoutCache];
         return;
     }
 
     // Do not cache download request.
-    if (self.resumableDownloadPath) {
+    if (self.resumableDownloadPath) { // 断点下载
         [self startWithoutCache];
         return;
     }
 
-    if (![self loadCacheWithError:nil]) {
+    if (![self loadCacheWithError:nil]) { // 本地没有缓存
         [self startWithoutCache];
         return;
     }
-
+    
     _dataFromCache = YES;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -140,9 +144,14 @@ static dispatch_queue_t ytkrequest_cache_writing_queue() {
 
 #pragma mark - Network Request Delegate
 
-- (void)requestCompletePreprocessor {
-    [super requestCompletePreprocessor];
 
+/**
+    数据请求成功时,会调用该方法用来缓存数据
+ */
+- (void)requestCompletePreprocessor {
+
+    [super requestCompletePreprocessor];
+    
     if (self.writeCacheAsynchronously) {
         dispatch_async(ytkrequest_cache_writing_queue(), ^{
             [self saveResponseDataToCacheFile:[super responseData]];
@@ -329,7 +338,7 @@ static dispatch_queue_t ytkrequest_cache_writing_queue() {
 }
 
 - (void)saveResponseDataToCacheFile:(NSData *)data {
-    if ([self cacheTimeInSeconds] > 0 && ![self isDataFromCache]) {
+    if ([self cacheTimeInSeconds] > 0 && ![self isDataFromCache]) { // 数据本身来自缓存不需要再次缓存
         if (data != nil) {
             @try {
                 // New data will always overwrite old data.
@@ -385,11 +394,14 @@ static dispatch_queue_t ytkrequest_cache_writing_queue() {
     }
 }
 
+// basePath
 - (NSString *)cacheBasePath {
+    //
     NSString *pathOfLibrary = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) objectAtIndex:0];
     NSString *path = [pathOfLibrary stringByAppendingPathComponent:@"LazyRequestCache"];
 
     // Filter cache base path
+    // 自定义文件缓存路径
     NSArray<id<YTKCacheDirPathFilterProtocol>> *filters = [[YTKNetworkConfig sharedConfig] cacheDirPathFilters];
     if (filters.count > 0) {
         for (id<YTKCacheDirPathFilterProtocol> f in filters) {
@@ -400,24 +412,27 @@ static dispatch_queue_t ytkrequest_cache_writing_queue() {
     [self createDirectoryIfNeeded:path];
     return path;
 }
-
+// 缓存文件名
 - (NSString *)cacheFileName {
     NSString *requestUrl = [self requestUrl];
     NSString *baseUrl = [YTKNetworkConfig sharedConfig].baseUrl;
+    // 读取子类指定的参数 作为缓存文件的名字
     id argument = [self cacheFileNameFilterForRequestArgument:[self requestArgument]];
+    
     NSString *requestInfo = [NSString stringWithFormat:@"Method:%ld Host:%@ Url:%@ Argument:%@",
                              (long)[self requestMethod], baseUrl, requestUrl, argument];
+    // 散列一下
     NSString *cacheFileName = [YTKNetworkUtils md5StringFromString:requestInfo];
     return cacheFileName;
 }
-
+// 缓存文件路径
 - (NSString *)cacheFilePath {
     NSString *cacheFileName = [self cacheFileName];
     NSString *path = [self cacheBasePath];
     path = [path stringByAppendingPathComponent:cacheFileName];
     return path;
 }
-
+// 缓存元数据路径
 - (NSString *)cacheMetadataFilePath {
     NSString *cacheMetadataFileName = [NSString stringWithFormat:@"%@.metadata", [self cacheFileName]];
     NSString *path = [self cacheBasePath];
